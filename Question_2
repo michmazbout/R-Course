@@ -1,0 +1,302 @@
+################################################################################
+# Exercise Two Code
+#Packages Installed 
+################################################################################
+install.packages("knitr")
+install.packages("gridExtra")
+################################################################################
+# Libraries Used
+################################################################################
+library(ggplot2)
+library(gridExtra)
+library(knitr)
+library(dplyr)
+library(purrr)
+library(factoextra)
+library(nortest)
+################################################################################
+# Exercise 2 Part 1
+# Loading the data 
+################################################################################
+load("C:/Users/Mojan/Desktop/slope dynamic/seconde year/Bachelor course/Temperatures_Interpolees.RData")
+
+load("./Temperatures_Interpolees.RData")
+################################################################################
+# Exercise 2 part 2
+# Extracting variable names and their types
+################################################################################
+variable_names <- names(df_interp)
+# Getting the data type of each column
+variable_types <- sapply(df_interp, class)
+################################################################################
+# Creating a data frame to display this information
+################################################################################
+variable_table <- data.frame(
+  Variable = variable_names,
+  Type = variable_types,
+  Description = c("Interpolated temperature", "X coordinate", "Y coordinate", "Altitude", "Slope", "Aspect", "Month", "Classified Aspect")  # Modify descriptions as appropriate
+)
+################################################################################
+# Summary of the data
+################################################################################
+summary(df_interp)
+################################################################################
+# Exercise 2 part 3
+# Removes x, y, Mois and Class_Aspect from the loop
+################################################################################
+selected_vars <- setdiff(names(df_interp), c("x", "y","Mois","CLASS_ASPECT"))
+################################################################################
+# Generate histograms for the selected variables
+################################################################################
+plots <- lapply(selected_vars, function(var) {
+  ggplot(df_interp, aes_string(x=var)) + 
+    geom_histogram(bins = 30, fill="blue", color="black") +  # Colors added for clarity
+    ggtitle(paste("Histogram of", var)) +
+    theme_minimal()  # Adds a minimal theme for cleaner look
+})
+################################################################################
+# Generate Histogram for Class_Aspect Variable
+################################################################################
+plot_2 <- (ggplot(df_interp,aes(x=CLASS_ASPECT))+
+             geom_histogram(stat = "count", fill="blue", color="black")+
+             ggtitle(paste("Histogram of Class Aspect"))+
+             theme_minimal() )
+################################################################################
+# Plotting all the Histograms
+################################################################################
+plots <- c(plots,list(plot_2))
+################################################################################
+# Arranging the plots in a grid
+################################################################################
+grid.arrange(grobs = plots, ncol = 2)
+################################################################################
+# Kolmogorov-Smirnov Test
+################################################################################
+# Temperature
+################################################################################
+standardized_interp <- (df_interp$interp - min(df_interp$interp)) / (max(df_interp$interp) - min(df_interp$interp))
+ks.test(standardized_interp, "punif")
+################################################################################
+# Exercise 2 part 4
+################################################################################
+# Set seed for reproducibility
+################################################################################
+set.seed(42)
+################################################################################
+# Filter the dataframe for interp values within the specified range
+df_interp_filtered <- df_interp[df_interp$Z >= 1300 & df_interp$Z <= 2000, ]
+################################################################################
+# Compute the density of the filtered interp values
+density_interp <- density(df_interp_filtered$interp)
+plot(density_interp)
+################################################################################
+# Use the density to compute weights for sampling
+interp_density_values <- approx(density_interp$x, density_interp$y, df_interp_filtered$interp, rule = 2)$y
+weights <- 1 / interp_density_values
+weights <- weights / sum(weights) # Normalize the weights
+################################################################################
+# Number of samples you want to draw
+n_samples <- 100
+################################################################################
+# Sampling based on the computed weights to get uniform distribution
+sampled_indices <- sample(seq_along(df_interp_filtered$interp), size = n_samples, replace = TRUE, prob = weights)
+sampled_df <- df_interp_filtered[sampled_indices, ]
+################################################################################
+# Histogram of the 'interp' variable in the sampled dataframe
+hist(sampled_df$interp, breaks = 30, col = "blue", main = "Histogram of Sampled 'interp' Data")
+################################################################################
+# Exercise 2 part 5
+################################################################################
+# Step 1: Identify numeric variables
+################################################################################
+numeric_vars <- sapply(df_interp, is.numeric)
+df_numeric <- df_interp[, numeric_vars]
+sampled_numeric <- sampled_df[, numeric_vars]
+################################################################################
+# Step 2: Combine the data frames with an identifier
+df_numeric$Sample <- 'Before'
+sampled_numeric$Sample <- 'After'
+combined_df <- rbind(df_numeric, sampled_numeric)
+################################################################################
+# Step 3: Melt the data frame for easier plotting
+combined_df_long <- reshape2::melt(combined_df, id.vars = 'Sample')
+################################################################################
+# Step 4: Create the plots
+p <- ggplot(combined_df_long, aes(x = value, fill = Sample, color = Sample, alpha = 0.5)) +
+  geom_density(alpha = 0.5) +
+  facet_wrap(~ variable, scales = 'free') +
+  scale_fill_manual(values = c("red", "blue")) +
+  scale_color_manual(values = c("red", "blue")) +
+  labs(title = "Density Plots Before and After Sampling", x = "Value", y = "Density") +
+  theme_minimal()
+################################################################################
+# Step 5: Display the plots
+print(p)
+################################################################################
+# Exercise 2 Part 6
+################################################################################
+# Calculating the average 'interp' temperature for each 'Mois'
+monthly_averages <- sampled_df %>%
+  group_by(Mois) %>%
+  summarise(average_interp = mean(interp, na.rm = TRUE), .groups = 'drop')  # na.rm = TRUE removes NA values
+
+# Viewing the monthly averages
+print(monthly_averages)
+
+# Performing Shapiro-Wilk test on the monthly averages
+shapiro_result <- shapiro.test(monthly_averages$average_interp)
+
+# Print the result
+print(shapiro_result)
+
+# Interpreting the result
+if (shapiro_result$p.value > 0.05) {
+  cat("The monthly averages of 'interp' appear to be normally distributed (p-value > 0.05).\n")
+} else {
+  cat("The monthly averages of 'interp' do not appear to be normally distributed (p-value <= 0.05).\n")
+}
+
+# Histogram of the monthly averages
+ggplot(monthly_averages, aes(x = average_interp)) +
+  geom_histogram(aes(y = ..density..), binwidth = 0.1, fill = "skyblue", color = "black") +
+  geom_density(color = "red", size = 1.5) +
+  ggtitle("Density and Histogram of Monthly Averages")
+
+# Plot of monthly averages
+ggplot(monthly_averages, aes(x = Mois, y = average_interp)) + 
+  geom_point() + 
+  geom_line()
+
+# Q-Q plot to assess normality visually
+ggplot(monthly_averages, aes(sample = average_interp)) +
+  geom_qq() +
+  geom_qq_line() +
+  ggtitle("Q-Q Plot of Monthly Averages")
+
+
+################################################################################
+# The Shapiro-Wilk Monthly normality test
+################################################################################
+results <- sampled_df %>%
+  group_by(Mois) %>%
+  summarise(
+    count = n(),  # Count the number of observations in each group
+    shapiro_test = if(count >= 3 && count <= 5000) list(shapiro.test(interp)) else list(NULL),  # Conditionally perform Shapiro-Wilk test
+    .groups = 'drop'  # Remove grouping structure after summarising
+  ) %>%
+  mutate(
+    normality_p_value = if_else(!map_lgl(shapiro_test, is.null), map_dbl(shapiro_test, ~ .x$p.value), NA_real_),  # Extract p-value if the test was performed
+    is_normal = normality_p_value > 0.05  # Correctly determine if distribution is normal based on p-value
+  )
+################################################################################
+# Print the results to review
+print(results)
+################################################################################
+# Creating a summary table
+summary_table <- results %>%
+  select(Mois, count, is_normal, normality_p_value)
+################################################################################
+# Print the summary table
+print(summary_table)
+################################################################################
+# Group data by CLASS_ASPECT and summarize
+################################################################################
+aspect_summary <- sampled_df %>%
+  group_by(CLASS_ASPECT) %>%
+  summarise(
+    count = n(),
+    mean_interp = mean(interp, na.rm = TRUE),
+    sd_interp = sd(interp, na.rm = TRUE),
+    .groups = 'drop'
+  )
+print(aspect_summary)
+################################################################################
+# Perform Shapiro-Wilk test for each category and store the results
+################################################################################
+normality_tests <- sampled_df %>%
+  group_by(CLASS_ASPECT) %>%
+  summarise(
+    shapiro_test = list(shapiro.test(interp)),
+    .groups = 'drop'
+  ) %>%
+  mutate(
+    p_value = sapply(shapiro_test, function(x) x$p.value),
+    is_normal = p_value > 0.05
+  )
+
+print(normality_tests)
+################################################################################
+# Visualizations for each category
+ggplot(sampled_df, aes(x = interp)) + 
+  geom_histogram(aes(y = ..density..), bins = 30, fill = "skyblue", alpha = 0.6) +
+  geom_density(color = "blue", size = 1.2) +
+  facet_wrap(~CLASS_ASPECT) +
+  ggtitle("Distribution of 'interp' by CLASS_ASPECT")
+
+ggplot(sampled_df, aes(sample = interp)) + 
+  geom_qq() + 
+  geom_qq_line() +
+  facet_wrap(~CLASS_ASPECT) +
+  ggtitle("Q-Q Plots by CLASS_ASPECT")
+
+#Question 7
+density_plot <- ggplot(df_interp, aes(x = interp, color = CLASS_ASPECT, fill = CLASS_ASPECT)) +
+  geom_density(alpha = 0.5) +
+  facet_wrap(~ Mois, scales = "free") +
+  labs(title = "Density Plot of Temperatures by Month and Orientation Class", x = "Temperature (interp)", y = "Density") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Set3") +
+  scale_color_brewer(palette = "Set3")
+
+
+plot(density_plot)
+
+################################################################################
+# Question 8
+################################################################################
+# Performing multiple linear regression
+model <- lm(interp ~ Z + Slope + aspect, data = df_interp_filtered)
+
+# Summary of the regression model
+summary(model)
+
+# Creating a summary table
+results_table <- data.frame(
+  Term = c("Intercept", "Z (Altitude)", "Slope", "aspect"),
+  Coefficient = coef(model),
+  `Std. Error` = coef(summary(model))[, "Std. Error"],
+  `t value` = coef(summary(model))[, "t value"],
+  `p value` = coef(summary(model))[, "Pr(>|t|)"]
+)
+
+# Printing the results table
+print(knitr::kable(results_table, digits = 4, caption = "Regression Coefficients Summary"))
+
+# Plotting residuals to check assumptions
+par(mfrow = c(2, 2))
+plot(model)
+
+
+################################################################################
+# Question 9
+################################################################################
+library("plyr")
+
+per.month.models <-
+ddply(df_interp_filtered, .(Mois), .fun = function(m){
+  model <- lm(interp ~ Z + Slope + aspect, data = m)
+
+  # Creating a summary table
+  results_table <- data.frame(
+  Term = c("Intercept", "Z", "Slope", "aspect"),
+  Coefficient = coef(model),
+  `Std. Error` = coef(summary(model))[, "Std. Error"],
+  `t value` = coef(summary(model))[, "t value"],
+  `p value` = coef(summary(model))[, "Pr(>|t|)"],
+  `r2` = summary(model)$r.squared
+  )
+})
+
+per.month.models$sign <- ""
+per.month.models[per.month.models$p.value < 0.05, 'sign'] <- "*"
+per.month.models
