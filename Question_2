@@ -300,3 +300,178 @@ ddply(df_interp_filtered, .(Mois), .fun = function(m){
 per.month.models$sign <- ""
 per.month.models[per.month.models$p.value < 0.05, 'sign'] <- "*"
 per.month.models
+# 8 question 
+
+# Pearson correlation coefficient between temperature and slope 
+
+cor_slope <- cor.test(sampled_df$interp, sampled_df$Slope, method = "pearson") 
+
+  
+
+# Pearson correlation coefficient between temperature and aspect 
+
+cor_aspect <- cor.test(sampled_df$interp, sampled_df$aspect, method = "pearson") 
+
+  
+
+# Pearson correlation coefficient between temperature and altitude (Z) 
+
+cor_altitude <- cor.test(sampled_df$interp, sampled_df$Z, method = "pearson") 
+
+  
+
+correlation_results <- data.frame( 
+
+  Variable = c("Slope", "Aspect", "Altitude (Z)"), 
+
+  Correlation = c(cor_slope$estimate, cor_aspect$estimate, cor_altitude$estimate), 
+
+  P_value = c(cor_slope$p.value, cor_aspect$p.value, cor_altitude$p.value) 
+
+) 
+
+  
+
+print(correlation_results) 
+
+  
+
+correlation_results <- data.frame( 
+
+  "Variable Effect on Temperature" = c("Slope", "Aspect", "Altitude (Z)"), 
+
+  Correlation = c(-0.02949593, 0.13248877, -0.16126814),   
+
+  P_value = c(0.7708110, 0.1888356, 0.1089530)  
+
+) 
+
+  
+
+kable(correlation_results, format = "markdown") 
+
+  
+
+# 9 question 
+
+library(plyr) 
+
+altitude_result <- ddply(sampled_df, .(Mois), summarize, 
+
+                         Correlation = cor(interp, Z), 
+
+                         P_value = cor.test(interp, Z)$p.value) 
+
+  
+
+  
+
+print(altitude_result) 
+
+  
+
+  
+
+library(plyr) 
+
+  
+
+Orientation_result <- ddply(sampled_df, .(Mois), summarize, 
+
+                         Correlation = cor(interp, aspect), 
+
+                         P_value = cor.test(interp, aspect)$p.value) 
+
+  
+
+  
+
+print(Orientation_result) 
+
+  
+
+library(plyr) 
+
+slope_result <- ddply(sampled_df, .(Mois), summarize, 
+
+                         Correlation = cor(interp, Slope), 
+
+                         P_value = cor.test(interp, Slope)$p.value) 
+
+print(slope_result) 
+
+  
+
+ggplot(Orientation_result, aes(x = factor(Mois), y = Correlation, fill = Variable)) + 
+
+  geom_bar(stat = "identity", position = "dodge", alpha = 0.7) + 
+
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") + 
+
+  geom_text(aes(label = sprintf("%.3f", P_value), y = Correlation + 0.05, color = "P-value"),  
+
+            position = position_dodge(width = 1),  
+
+            vjust = -0.5, size = 3) +   
+
+  labs(title = "Correlation between Orientation (Aspect) and Temperature", 
+
+       x = "Month", y = "Correlation") + 
+
+  scale_color_manual(name = "P-value", values = c("P-value" = "blue")) +   
+
+  theme_minimal() + 
+
+  scale_x_discrete(breaks = seq(1, 12, by = 1)) 
+
+  
+
+  
+
+ggplot(slope_result, aes(x = factor(Mois), y = Correlation, fill = Variable)) + 
+
+  geom_bar(stat = "identity", position = "dodge", alpha = 0.7) + 
+
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") + 
+
+  geom_text(aes(label = sprintf("%.3f", P_value), y = Correlation + 0.05, color = "P-value"),  
+
+            position = position_dodge(width = 1),  
+
+            vjust = -0.5, size = 3) +   
+
+  labs(title = "Correlation between Slope and Temperature", 
+
+       x = "Month", y = "Correlation") + 
+
+  scale_color_manual(name = "P-value", values = c("P-value" = "blue")) +   
+
+  theme_minimal() + 
+
+  scale_x_discrete(breaks = seq(1, 12, by = 1)) 
+
+  
+
+  
+
+ggplot(altitude_result, aes(x = factor(Mois), y = Correlation, fill = Variable)) + 
+
+  geom_bar(stat = "identity", position = "dodge", alpha = 0.7) + 
+
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") + 
+
+  geom_text(aes(label = sprintf("%.3f", P_value), y = Correlation + 0.05, color = "P-value"),  
+
+            position = position_dodge(width = 1),  
+
+            vjust = -0.5, size = 3) +   
+
+  labs(title = "Correlation between Altitude and Temperature", 
+
+       x = "Month", y = "Correlation") + 
+
+  scale_color_manual(name = "P-value", values = c("P-value" = "blue")) +   
+
+  theme_minimal() + 
+
+  scale_x_discrete(breaks = seq(1, 12, by = 1)) 
